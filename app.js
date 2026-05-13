@@ -2381,6 +2381,7 @@ function draw() {
   background(palette.bg);
   drawGuides();
   if (!state.ready) return;
+  tickGrowthLoop();
   const time = millis() * 0.001;
   drawParasites(time);
   drawExcisions();
@@ -2437,6 +2438,7 @@ function tickGrowthLoop() {
   }
 }
 
+function windowResized() {
   const holder = document.getElementById("canvas-holder");
   resizeCanvas(holder.clientWidth, holder.clientHeight);
   rebuildHost();
