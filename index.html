@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Parasitic Type System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Barlow+Condensed:wght@500;700&family=Chivo+Mono:wght@500;700&family=DM+Sans:wght@500;700&family=IBM+Plex+Sans:wght@500;700&family=Libre+Franklin:wght@500;700&family=Noto+Sans+SC:wght@500;700&family=Noto+Serif+SC:wght@500;700&family=Oswald:wght@500;700&family=Space+Grotesk:wght@500;700&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <div class="panel-head">
+      <div class="eyebrow">Generative Typography Protocol</div>
+      <h1>Parasitic Type System</h1>
+      <p class="sub">Letters are now only invisible hosts. The visible body is a mycelial terrain: contour growth, edge drift, and inherited topographic pressure living inside and around the typographic field.</p>
+    </div>
+
+    <div class="scroll">
+      <section class="section">
+        <div class="section-title">Host</div>
+        <textarea id="textInput" class="field field-textarea" rows="3" maxlength="42">PARASITE</textarea>
+        <div class="stack">
+          <label class="label" for="fontSelect">Typeface</label>
+          <select id="fontSelect" class="field">
+            <option value="IBM Plex Sans" selected>IBM Plex Sans</option>
+            <option value="Space Grotesk">Space Grotesk</option>
+            <option value="Archivo Narrow">Archivo Narrow</option>
+            <option value="Libre Franklin">Libre Franklin</option>
+            <option value="Barlow Condensed">Barlow Condensed</option>
+            <option value="Oswald">Oswald</option>
+            <option value="DM Sans">DM Sans</option>
+            <option value="Chivo Mono">Chivo Mono</option>
+            <option value="Noto Sans SC">Noto Sans SC / 思源黑体</option>
+            <option value="Noto Serif SC">Noto Serif SC / 思源宋体</option>
+            <option value="ZCOOL QingKe HuangYou">ZCOOL QingKe / 站酷庆科黄油</option>
+          </select>
+        </div>
+        <div class="stack">
+          <label class="label" for="fontUpload">Upload Typeface</label>
+          <input id="fontUpload" class="field field-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" />
+        </div>
+        <p class="tiny">Supports English and Chinese. Up to 3 lines, 42 characters total. Upload a local CJK font if the built-in choices do not cover the glyphs you need.</p>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Parameters</div>
+        <div class="row"><span>Infection</span><span class="value" id="infectionVal">68</span></div>
+        <input id="infection" type="range" min="0" max="100" value="68" />
+        <div class="row"><span>Growth</span><span class="value" id="growthVal">54</span></div>
+        <input id="growth" type="range" min="0" max="100" value="54" />
+        <div class="row"><span>Mutation</span><span class="value" id="mutationVal">36</span></div>
+        <input id="mutation" type="range" min="0" max="100" value="36" />
+        <div class="row"><span>Generation</span><span class="value" id="generationVal">4</span></div>
+        <input id="generation" type="range" min="1" max="8" value="4" />
+        <div class="row"><span>Resistance</span><span class="value" id="resistanceVal">48</span></div>
+        <input id="resistance" type="range" min="0" max="100" value="48" />
+      </section>
+
+      <section class="section">
+        <div class="section-title">Species</div>
+        <div class="species">
+          <button class="species-chip active" data-species="hybrid" type="button">Mycelial Terrain</button>
+          <button class="species-chip" data-species="spore" type="button">Surface Tension</button>
+          <button class="species-chip" data-species="rect" type="button">Guillotine Field</button>
+          <button class="species-chip" data-species="memetic" type="button">Memetic</button>
+        </div>
+        <div class="stack">
+          <label class="label" for="colorSelect">Line Color</label>
+          <select id="colorSelect" class="field">
+            <option value="acid" selected>Acid Green</option>
+            <option value="cobalt">Cobalt Blue</option>
+            <option value="ember">Ember Red</option>
+            <option value="mono">Monochrome</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="stack">
+          <label class="label" for="customColor">Custom Color</label>
+          <input id="customColor" class="field field-color" type="color" value="#00ff66" />
+        </div>
+        <div class="stack">
+          <label class="label" for="bgColor">Background Color</label>
+          <input id="bgColor" class="field field-color" type="color" value="#f6f5f2" />
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Actions</div>
+        <div class="btn-row">
+          <button id="svgBtn" class="btn" type="button">Export SVG</button>
+          <button id="pngBtn" class="btn" type="button">Export PNG</button>
+        </div>
+        <div class="btn-row">
+          <button id="stepBtn" class="btn" type="button">Next Gen</button>
+          <button id="resetBtn" class="btn primary" type="button">Reset</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Protocol</div>
+        <p class="tiny">Click to inoculate. Drag to spread. Hold to bloom. Shift + click to excise. The letterform is only a hidden mask, so the glyph is inferred from biological occupation rather than drawn as a solid shape.</p>
+      </section>
+    </div>
+  </aside>
+
+  <main class="stage-wrap">
+    <section class="stage">
+      <div id="canvas-holder"></div>
+      <div class="overlay">
+        <div class="badge">Hidden host mask + mycelial contour terrain + generational inheritance</div>
+        <div id="status" class="status"><strong>Preparing host mask.</strong> Loading built-in type family.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
