@@ -7,6 +7,8 @@ const palette = {
 
 const settings = {
   text: "PARASITE",
+  hostMode: "text",
+  svgHost: null,
   fontFamily: "IBM Plex Sans",
   colorway: "acid",
   customColor: "#00ff66",
@@ -324,6 +326,57 @@ function deriveBridgePairs(edgeNodes, sampleStep) {
   return bridges.slice(0, 8);
 }
 
+function extractMaskNodes(w, h, sampleHint = 1) {
+  let minX = w;
+  let minY = h;
+  let maxX = 0;
+  let maxY = 0;
+  const interior = [];
+  const edge = [];
+  const attractors = [];
+  const step = 4 + clamp(sampleHint, 1, 5) * 2;
+  const attractorStep = step * 2;
+
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      if (!insideMask(x, y)) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      const edgeValue = edgeStrength(x, y);
+      const node = { x, y };
+      interior.push(node);
+      if (edgeValue > 0) edge.push(node);
+      if (x % attractorStep === 0 && y % attractorStep === 0) {
+        attractors.push(node);
+      }
+    }
+  }
+
+  state.bbox = {
+    x1: minX,
+    y1: minY,
+    x2: maxX,
+    y2: maxY
+  };
+  state.sampleStep = step;
+  state.interiorNodes = interior;
+  state.edgeNodes = edge;
+  state.attractors = attractors;
+  state.bridgePairs = deriveBridgePairs(edge, step);
+  state.manualSeeds = [];
+  state.excisions = [];
+  state.ready = interior.length > 0;
+}
+
+function fitRectIntoBox(sourceW, sourceH, boxW, boxH) {
+  const scale = Math.min(boxW / Math.max(sourceW, 1), boxH / Math.max(sourceH, 1));
+  const w = sourceW * scale;
+  const h = sourceH * scale;
+  return { w, h, scale };
+}
+
 function buildMask() {
   ensureMaskCanvas();
   const holder = document.getElementById("canvas-holder");
@@ -334,6 +387,23 @@ function buildMask() {
 
   const ctx = state.maskCtx;
   ctx.clearRect(0, 0, w, h);
+
+  if (settings.hostMode === "svg" && settings.svgHost?.image) {
+    const img = settings.svgHost.image;
+    const fit = fitRectIntoBox(img.naturalWidth || img.width || 1, img.naturalHeight || img.height || 1, w * 0.7, h * 0.58);
+    const x = (w - fit.w) * 0.5;
+    const y = (h - fit.h) * 0.52;
+    ctx.save();
+    ctx.fillStyle = "#000";
+    ctx.drawImage(img, x, y, fit.w, fit.h);
+    ctx.globalCompositeOperation = "source-in";
+    ctx.fillRect(x, y, fit.w, fit.h);
+    ctx.restore();
+    const image = ctx.getImageData(0, 0, w, h);
+    state.maskData = image.data;
+    extractMaskNodes(w, h, 3);
+    return;
+  }
 
   const lines = settings.text.split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 3);
   const textLines = lines.length ? lines : ["HOST"];
@@ -370,48 +440,8 @@ function buildMask() {
   const image = ctx.getImageData(0, 0, w, h);
   state.maskData = image.data;
 
-  let minX = w;
-  let minY = h;
-  let maxX = 0;
-  let maxY = 0;
-  const interior = [];
-  const edge = [];
-  const attractors = [];
   const sampleTarget = clamp(Math.floor((textLines.join("").length || 1) / 10) + textLines.length, 1, 5);
-  const step = 4 + sampleTarget * 2;
-  const attractorStep = step * 2;
-
-  for (let y = 0; y < h; y += step) {
-    for (let x = 0; x < w; x += step) {
-      if (!insideMask(x, y)) continue;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-      const edgeValue = edgeStrength(x, y);
-      const node = { x, y };
-      interior.push(node);
-      if (edgeValue > 0) edge.push(node);
-      if (x % attractorStep === 0 && y % attractorStep === 0) {
-        attractors.push(node);
-      }
-    }
-  }
-
-  state.bbox = {
-    x1: minX,
-    y1: minY,
-    x2: maxX,
-    y2: maxY
-  };
-  state.sampleStep = step;
-  state.interiorNodes = interior;
-  state.edgeNodes = edge;
-  state.attractors = attractors;
-  state.bridgePairs = deriveBridgePairs(edge, step);
-  state.manualSeeds = [];
-  state.excisions = [];
-  state.ready = interior.length > 0;
+  extractMaskNodes(w, h, sampleTarget);
 }
 
 function fontReady(fontFamily) {
@@ -454,6 +484,53 @@ async function handleFontUpload(event) {
   } finally {
     event.target.value = "";
   }
+}
+
+function svgTitleFromFile(file) {
+  return file.name
+    .replace(/\.svg$/i, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim() || "Uploaded SVG";
+}
+
+async function handleSvgUpload(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (!/\.svg$/i.test(file.name) && file.type !== "image/svg+xml") {
+    setStatus("<strong>Unsupported SVG.</strong> Please upload an SVG file.");
+    return;
+  }
+
+  const svgText = await file.text();
+  if (/<script[\s>]/i.test(svgText) || /\son\w+=/i.test(svgText) || /\b(?:href|src)=["']https?:\/\//i.test(svgText)) {
+    setStatus("<strong>SVG blocked.</strong> Please remove scripts, inline event handlers, or remote resources first.");
+    event.target.value = "";
+    return;
+  }
+
+  const blob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  image.onload = async () => {
+    if (settings.svgHost?.url) URL.revokeObjectURL(settings.svgHost.url);
+    settings.hostMode = "svg";
+    settings.svgHost = {
+      name: svgTitleFromFile(file),
+      url,
+      image,
+      source: svgText
+    };
+    setStatus(`<strong>${settings.svgHost.name}</strong> SVG host loaded. Rebuilding hidden mask.`);
+    await rebuildHost();
+    event.target.value = "";
+  };
+  image.onerror = () => {
+    URL.revokeObjectURL(url);
+    setStatus("<strong>SVG load failed.</strong> The file may be malformed.");
+    event.target.value = "";
+  };
+  image.src = url;
 }
 
 function makeSeed(point, inherited = false, force = 1) {
@@ -2661,6 +2738,12 @@ function generateRectStrokeGuides(bbox) {
     .slice(-limit);
 }
 
+function hostLabel() {
+  return settings.hostMode === "svg" && settings.svgHost?.name
+    ? `${settings.svgHost.name} SVG`
+    : settings.fontFamily;
+}
+
 function generateRectilinearField() {
   const bbox = state.bbox || { x1: width * 0.3, y1: height * 0.35, x2: width * 0.7, y2: height * 0.65 };
   const grow = mapRange(settings.growth, 0, 100, 12, 96);
@@ -2770,7 +2853,7 @@ function regenerateParasites() {
     state.parasites = [generateHybridField()];
     state.growthStartMs = millis();
     setStatus(
-      `<strong>${settings.fontFamily}</strong> host mask, <strong>Mycelial Terrain</strong> species, ` +
+      `<strong>${hostLabel()}</strong> host mask, <strong>Mycelial Terrain</strong> species, ` +
       `<strong>${state.parasites[0].segments.length}</strong> contour segments. ` +
       `I<strong>${settings.infection}</strong> G<strong>${settings.growth}</strong> ` +
       `M<strong>${settings.mutation}</strong> Gen<strong>${settings.generation}</strong> R<strong>${settings.resistance}</strong>.`
@@ -2783,7 +2866,7 @@ function regenerateParasites() {
     state.parasites = [generateSporeField()];
     state.growthStartMs = millis();
     setStatus(
-      `<strong>${settings.fontFamily}</strong> host mask, <strong>Surface Tension</strong> species, ` +
+      `<strong>${hostLabel()}</strong> host mask, <strong>Surface Tension</strong> species, ` +
       `<strong>${state.parasites[0].particles.length}</strong> relaxed particles, ` +
       `<strong>${state.parasites[0].membranes.length}</strong> extracted membranes.`
     );
@@ -2795,7 +2878,7 @@ function regenerateParasites() {
     state.parasites = [generateRectilinearField()];
     state.growthStartMs = millis();
     setStatus(
-      `<strong>${settings.fontFamily}</strong> host mask, <strong>Guillotine Field</strong> species, ` +
+      `<strong>${hostLabel()}</strong> host mask, <strong>Guillotine Field</strong> species, ` +
       `<strong>${state.parasites[0].cells.length}</strong> retained cuts.`
     );
     redraw();
@@ -2833,7 +2916,7 @@ function regenerateParasites() {
   state.parasites = branches;
   state.growthStartMs = millis();
   setStatus(
-    `<strong>${settings.fontFamily}</strong> host mask, <strong>${settings.species}</strong> species, ` +
+    `<strong>${hostLabel()}</strong> host mask, <strong>${settings.species}</strong> species, ` +
     `<strong>${state.parasites.length}</strong> fungal bodies, generation <strong>${settings.generation}</strong>.`
   );
   redraw();
@@ -2978,6 +3061,7 @@ function bindUI() {
   dom.textInput = document.getElementById("textInput");
   dom.fontSelect = document.getElementById("fontSelect");
   dom.fontUpload = document.getElementById("fontUpload");
+  dom.svgUpload = document.getElementById("svgUpload");
   dom.colorSelect = document.getElementById("colorSelect");
   dom.customColor = document.getElementById("customColor");
   dom.bgColor = document.getElementById("bgColor");
@@ -3001,6 +3085,7 @@ function bindUI() {
     state.isComposing = false;
     const normalized = normalizeHostText(dom.textInput.value);
     if (normalized !== dom.textInput.value) dom.textInput.value = normalized;
+    settings.hostMode = "text";
     settings.text = normalized;
     scheduleRebuild(40);
   });
@@ -3009,6 +3094,7 @@ function bindUI() {
     if (state.isComposing) return;
     const normalized = normalizeHostText(dom.textInput.value);
     if (normalized !== dom.textInput.value) dom.textInput.value = normalized;
+    settings.hostMode = "text";
     settings.text = normalized;
     scheduleRebuild(90);
   });
@@ -3019,6 +3105,7 @@ function bindUI() {
   });
 
   dom.fontUpload.addEventListener("change", handleFontUpload);
+  dom.svgUpload.addEventListener("change", handleSvgUpload);
 
   dom.colorSelect.addEventListener("change", () => {
     settings.colorway = dom.colorSelect.value;
